@@ -36,7 +36,7 @@
     "test:packed": "tsx test/packed-consumer.test.ts",
     "test:rules": "for test in src/rules/*.test.ts src/effect/rules/*.test.ts; do tsx \"$test\" || exit 1; done",
     "test": "npm run build && npm run test:exports && npm run test:rules",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm test"
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:rules && npm run build && npm run test:exports && npm run test:packed"
   },
   "dependencies": {
     "@oxlint/plugins": "1.78.0"

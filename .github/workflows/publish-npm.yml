@@ -1,0 +1,95 @@
+name: Publish npm package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish package
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify release identity and package version
+        env:
+          EXPECTED_PACKAGE: "@sematico/anti-slop"
+          EXPECTED_REPOSITORY: "alessandrotesoro/anti-slop"
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$GITHUB_REF_TYPE" = "tag"
+
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          test "$package_name" = "$EXPECTED_PACKAGE"
+          test "$RELEASE_TAG" = "v$package_version"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run repository verification
+        run: npm run verify
+
+      - name: Inspect package contents
+        run: npm pack --dry-run --json
+
+      - name: Check published package version
+        id: published
+        env:
+          EXPECTED_PACKAGE: "@sematico/anti-slop"
+          EXPECTED_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          EXPECTED_VERSION="${EXPECTED_VERSION#v}"
+          if npm view "$EXPECTED_PACKAGE@$EXPECTED_VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$EXPECTED_PACKAGE@$EXPECTED_VERSION already exists; refusing to republish it."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm with trusted publishing
+        if: steps.published.outputs.exists != 'true'
+        run: npm publish --access public --provenance --ignore-scripts
+
+      - name: Verify public npm publication
+        env:
+          EXPECTED_PACKAGE: "@sematico/anti-slop"
+          EXPECTED_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          EXPECTED_VERSION="${EXPECTED_VERSION#v}"
+          for attempt in 1 2 3 4 5 6; do
+            echo "Checking npm visibility (attempt $attempt/6)."
+            if npm view "$EXPECTED_PACKAGE@$EXPECTED_VERSION" version >/dev/null 2>&1; then
+              npm view "$EXPECTED_PACKAGE@$EXPECTED_VERSION" version
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "$EXPECTED_PACKAGE@$EXPECTED_VERSION was not visible on npm after publication."
+          exit 1

@@ -66,6 +66,26 @@ root package:
 `@sematico/anti-slop/effect` contains only
 `no-service-constructor-imports`.
 
+## Release
+
+The first `0.1.0` release must be bootstrapped manually because npm trusted
+publishing cannot create a new package. From a clean checkout, run
+`npm run verify` and `npm pack --dry-run --json`, then publish `0.1.0` from an
+authenticated `@sematico` account with 2FA and public access:
+
+```sh
+npm publish --access public --ignore-scripts
+```
+
+After that bootstrap, configure npm trusted publishing for the exact GitHub
+repository `alessandrotesoro/anti-slop` and the workflow
+`.github/workflows/publish-npm.yml`. Configure a protected GitHub environment
+named `npm` with a maintainer required reviewer. For each follow-up release,
+update the package version and lockfile, push a matching `v<version>` tag, and
+approve the `npm` deployment when prompted. The workflow publishes with npm
+OIDC provenance and verifies that the version is visible in the public
+registry.
+
 ## Attribution and updates
 
 This package preserves the upstream MIT notice in [LICENSE](./LICENSE). The
