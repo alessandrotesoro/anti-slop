@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn",
+    "style": "off"
+  },
+  "plugins": ["typescript", "unicorn", "import", "node", "promise"],
+  "ignorePatterns": ["dist/**", "node_modules/**"],
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "typescript/no-explicit-any": "off"
+      }
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "@sematico/anti-slop",
+  "version": "0.1.0",
+  "description": "Opinionated Oxlint rules that reject low-evidence TypeScript and JavaScript patterns.",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./effect": {
+      "types": "./dist/effect.d.ts",
+      "import": "./dist/effect.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "test:exports": "node --test test/package-exports.test.ts",
+    "test:rules": "for test in src/rules/*.test.ts src/effect/rules/*.test.ts; do tsx \"$test\" || exit 1; done",
+    "test": "npm run build && npm run test:exports && npm run test:rules",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@oxlint/plugins": "1.78.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "oxfmt": "0.48.0",
+    "oxlint": "1.78.0",
+    "tsup": "8.5.0",
+    "tsx": "4.23.12",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
