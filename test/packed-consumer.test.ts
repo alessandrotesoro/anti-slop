@@ -3,12 +3,13 @@ import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { deepStrictEqual, match, ok, strictEqual } from "node:assert/strict";
 
 type PackedFile = { filename: string };
 type PackageManifest = { scripts?: Record<string, string> };
 
-const repoRoot = resolve(new URL("..", import.meta.url).pathname);
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const oxlintVersion = "1.78.0";
 
 function runOxlint(consumerRoot: string, configPath: string, sourcePath: string) {
@@ -33,19 +34,22 @@ async function writeJson(path: string, value: unknown) {
 
 test("the packed package works from a fresh npm consumer", async () => {
   const consumerRoot = await mkdtemp(join(tmpdir(), "anti-slop-consumer-"));
-  let tarballPath: string | undefined;
 
   try {
     execFileSync("npm", ["run", "build"], { cwd: repoRoot, stdio: "ignore" });
 
     const packed = JSON.parse(
-      execFileSync("npm", ["pack", "--json", "--ignore-scripts"], {
-        cwd: repoRoot,
-        encoding: "utf8",
-      }),
+      execFileSync(
+        "npm",
+        ["pack", "--json", "--ignore-scripts", "--pack-destination", consumerRoot],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+        },
+      ),
     ) as PackedFile[];
     strictEqual(packed.length, 1);
-    tarballPath = resolve(repoRoot, packed[0].filename);
+    const tarballPath = resolve(consumerRoot, packed[0].filename);
 
     await writeJson(join(consumerRoot, "package.json"), {
       name: "anti-slop-consumer",
@@ -150,6 +154,5 @@ test("the packed package works from a fresh npm consumer", async () => {
     ok(!tarballEntries.some((entry) => entry.startsWith("package/node_modules/")));
   } finally {
     await rm(consumerRoot, { recursive: true, force: true });
-    if (tarballPath !== undefined) await rm(tarballPath, { force: true });
   }
 });
