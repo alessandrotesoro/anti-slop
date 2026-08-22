@@ -1,8 +1,22 @@
-# @sematico/anti-slop
+<div align="center">
+  <h1>@sematico/anti-slop</h1>
+  <p>Opinionated Oxlint rules for TypeScript and JavaScript codebases.</p>
 
-An npm distribution of [anti-slop](https://github.com/dmmulroy/anti-slop), a
-small set of Oxlint JavaScript-plugin rules for rejecting low-evidence and
-low-signal TypeScript and JavaScript patterns.
+  <p>
+    <a href="https://www.npmjs.com/package/@sematico/anti-slop"><img src="https://img.shields.io/npm/v/%40sematico%2Fanti-slop?style=flat-square&logo=npm&label=npm" alt="npm version"></a>
+    <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D22-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js >=22"></a>
+    <a href="https://oxc.rs/docs/guide/usage/linter/js-plugins"><img src="https://img.shields.io/badge/oxlint-1.78.0-5e6ad2?style=flat-square" alt="Oxlint 1.78.0"></a>
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT license"></a>
+  </p>
+</div>
+
+`@sematico/anti-slop` packages a focused set of Oxlint JavaScript-plugin rules
+that reject low-evidence, low-signal patterns: hidden type widening, unparsed
+boundaries, unsafe escape hatches, and architecture shortcuts.
+
+> [!NOTE]
+> Oxlint JavaScript plugins are currently alpha. This package is tested with
+> Oxlint `1.78.0`, `@oxlint/plugins` `1.78.0`, and Node.js `22+`.
 
 ## Install
 
@@ -10,48 +24,32 @@ low-signal TypeScript and JavaScript patterns.
 npm install --save-dev oxlint @sematico/anti-slop
 ```
 
-This package supports Node.js 22 and newer. The plugin API is currently alpha,
-so compatibility is described as tested support rather than a semver promise.
-The published package is tested with Oxlint `1.78.0` and
-`@oxlint/plugins` `1.78.0`.
+The package is ESM-only and ships prebuilt JavaScript and TypeScript
+declarations. It does not run install hooks, fetch source code, or edit your
+Oxlint configuration.
 
-## Configure the generic rules
+## Configure
 
-Register the package specifier in your Oxlint configuration and enable the
-rules you want:
+### Generic rules
+
+Register the root plugin in your Oxlint configuration and enable the rules that
+fit your codebase:
 
 ```json
 {
   "jsPlugins": ["@sematico/anti-slop"],
   "rules": {
     "anti-slop/no-unknown-parameters": "error",
-    "anti-slop/no-unknown-returns": "error"
+    "anti-slop/no-unknown-returns": "error",
+    "anti-slop/require-safety-comment-for-type-assertion": "warn"
   }
 }
 ```
 
-The root export contains these 15 rules:
+### Effect rules
 
-- `no-chained-type-assertions`
-- `no-conditional-empty-object-spread`
-- `no-known-value-widening`
-- `no-module-mocking`
-- `no-object-parameters`
-- `no-reflect-apply`
-- `no-reflect-get`
-- `no-runtime-typeof`
-- `no-shape-in-symbol-names`
-- `no-unknown-parameters`
-- `no-unknown-returns`
-- `no-unknown-type-aliases`
-- `no-unsafe-dictionary-type`
-- `no-widen-then-assert`
-- `require-safety-comment-for-type-assertion`
-
-## Opt in to the Effect rule
-
-The Effect policy is a separate export and is never enabled by registering the
-root package:
+Effect policy is opt-in through a separate export. Register it only when your
+project uses Effect services and Layers:
 
 ```json
 {
@@ -63,34 +61,58 @@ root package:
 }
 ```
 
-`@sematico/anti-slop/effect` contains only
-`no-service-constructor-imports`.
+Registering the root package alone never enables the Effect rule.
 
-## Release
+## Rules
 
-The npm namespace is bootstrapped once with an empty public `0.0.0` package;
-npm trusted publishing cannot create a new package. The first real release is
-`0.1.0` and is published by the GitHub Actions workflow. From a clean checkout,
-run `npm run verify` and `npm pack --dry-run --json`, then configure npm trusted
-publishing for the exact GitHub repository and workflow below:
+The root export contains 15 generic rules:
+
+| Rule                                        | Purpose                                                            |
+| ------------------------------------------- | ------------------------------------------------------------------ |
+| `no-chained-type-assertions`                | Reject chained `as` and angle-bracket assertions.                  |
+| `no-conditional-empty-object-spread`        | Reject conditional spreads of an empty object to omit fields.      |
+| `no-known-value-widening`                   | Keep known values from flowing into broad target types.            |
+| `no-module-mocking`                         | Replace Jest and Vitest module mocks with real interfaces.         |
+| `no-object-parameters`                      | Require named owner types instead of `object` parameters.          |
+| `no-reflect-apply`                          | Replace `Reflect.apply` with typed calls or interfaces.            |
+| `no-reflect-get`                            | Replace `Reflect.get` with typed property access.                  |
+| `no-runtime-typeof`                         | Require boundary decoding instead of runtime `typeof` checks.      |
+| `no-shape-in-symbol-names`                  | Keep the structural term `shape` out of symbol names.              |
+| `no-unknown-parameters`                     | Decode `unknown` inputs at their I/O boundary.                     |
+| `no-unknown-returns`                        | Keep `unknown` out of public return contracts.                     |
+| `no-unknown-type-aliases`                   | Keep aliases from hiding `unknown`.                                |
+| `no-unsafe-dictionary-type`                 | Require concrete value types for dictionaries.                     |
+| `no-widen-then-assert`                      | Reject widening a value before asserting it back to a narrow type. |
+| `require-safety-comment-for-type-assertion` | Require a nearby `SAFETY:` justification for type assertions.      |
+
+The `@sematico/anti-slop/effect` export contains one additional opt-in rule:
+`no-service-constructor-imports`, which keeps project-local Effect service
+constructors out of runtime code.
+
+## Development
 
 ```sh
-npm trust github @sematico/anti-slop \
-  --file publish-npm.yml \
-  --repo alessandrotesoro/anti-slop \
-  --env npm \
-  --allow-publish
+git clone https://github.com/alessandrotesoro/anti-slop.git
+cd anti-slop
+npm ci
+npm run verify
 ```
 
-Configure the GitHub environment named `npm` according to your repository
-plan. Push a matching `v<version>` tag (the first one is `v0.1.0`) to run
-`.github/workflows/publish-npm.yml`. The workflow publishes with npm OIDC
-provenance and verifies that the version is visible in the public registry.
+Useful checks:
 
-## Attribution and updates
+- `npm run verify` runs formatting, linting, type checking, rule tests, the
+  build, export checks, and an isolated packed-consumer test.
+- `npm run test:packed` installs the generated tarball into a fresh npm
+  consumer and verifies both plugin entry points with Oxlint.
+- `npm run build` emits the root and Effect ESM entry points in `dist/`.
 
-This package preserves the upstream MIT notice in [LICENSE](./LICENSE). The
-vendored commit and manual refresh procedure are recorded in
-[UPSTREAM.md](./UPSTREAM.md). Rule behavior is intentionally kept aligned with
-that snapshot; upstream refreshes should be reviewed rather than fetched at
-install or lint time.
+The vendored source is pinned to an upstream commit. Review the upstream diff,
+update [UPSTREAM.md](./UPSTREAM.md), and rerun `npm run verify` when refreshing
+that snapshot.
+
+## Credits
+
+This package is a distribution of [Dillon Mulroy's `anti-slop` repository](https://github.com/dmmulroy/anti-slop),
+vendored at commit [`6d538555cb151d4121ed51a27db81890eacf8ae9`](https://github.com/dmmulroy/anti-slop/tree/6d538555cb151d4121ed51a27db81890eacf8ae9).
+The upstream MIT notice is preserved in [LICENSE](./LICENSE), and the snapshot
+provenance is documented in [UPSTREAM.md](./UPSTREAM.md).
