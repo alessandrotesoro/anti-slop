@@ -22,12 +22,12 @@ jobs:
       id-token: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24.x
           package-manager-cache: false
@@ -49,13 +49,22 @@ jobs:
           test "$RELEASE_TAG" = "v$package_version"
 
       - name: Install locked dependencies
-        run: npm ci
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
+        run: npm ci --ignore-scripts
 
       - name: Run repository verification
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
         run: npm run verify
 
       - name: Inspect package contents
-        run: npm pack --dry-run --json
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
+        run: npm pack --dry-run --json --ignore-scripts
 
       - name: Check published package version
         id: published
@@ -65,15 +74,30 @@ jobs:
         run: |
           set -euo pipefail
           EXPECTED_VERSION="${EXPECTED_VERSION#v}"
-          if npm view "$EXPECTED_PACKAGE@$EXPECTED_VERSION" version >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "$EXPECTED_PACKAGE@$EXPECTED_VERSION already exists; refusing to republish it."
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+          for attempt in 1 2 3; do
+            if npm_view_output="$(npm view "$EXPECTED_PACKAGE@$EXPECTED_VERSION" version 2>&1)"; then
+              echo "$EXPECTED_PACKAGE@$EXPECTED_VERSION already exists; refusing to republish it." >&2
+              exit 1
+            else
+              npm_view_status=$?
+              if grep -Eq "npm error code E404|E404|404 Not Found" <<<"$npm_view_output"; then
+                echo "exists=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              if [ "$attempt" -eq 3 ]; then
+                printf '%s\n' "$npm_view_output" >&2
+                echo "Could not determine whether $EXPECTED_PACKAGE@$EXPECTED_VERSION exists on npm." >&2
+                exit "$npm_view_status"
+              fi
+
+              echo "npm view failed; retrying (attempt $attempt/3)." >&2
+              sleep $((attempt * 5))
+            fi
+          done
 
       - name: Publish to npm with trusted publishing
-        if: steps.published.outputs.exists != 'true'
+        if: steps.published.outputs.exists == 'false'
         run: npm publish --access public --provenance --ignore-scripts
 
       - name: Verify public npm publication
@@ -85,8 +109,8 @@ jobs:
           EXPECTED_VERSION="${EXPECTED_VERSION#v}"
           for attempt in 1 2 3 4 5 6; do
             echo "Checking npm visibility (attempt $attempt/6)."
-            if npm view "$EXPECTED_PACKAGE@$EXPECTED_VERSION" version >/dev/null 2>&1; then
-              npm view "$EXPECTED_PACKAGE@$EXPECTED_VERSION" version
+            if published_version="$(npm view "$EXPECTED_PACKAGE@$EXPECTED_VERSION" version 2>/dev/null)"; then
+              printf '%s\n' "$published_version"
               exit 0
             fi
             sleep 10

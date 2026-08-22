@@ -7,10 +7,12 @@ import { fileURLToPath } from "node:url";
 import { deepStrictEqual, match, ok, strictEqual } from "node:assert/strict";
 
 type PackedFile = { filename: string };
-type PackageManifest = { scripts?: Record<string, string> };
+type PackageManifest = {
+  devDependencies?: Record<string, string>;
+  scripts?: Record<string, string>;
+};
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const oxlintVersion = "1.78.0";
 
 function runOxlint(consumerRoot: string, configPath: string, sourcePath: string) {
   const result = spawnSync(
@@ -37,6 +39,14 @@ test("the packed package works from a fresh npm consumer", async () => {
 
   try {
     execFileSync("npm", ["run", "build"], { cwd: repoRoot, stdio: "ignore" });
+    const packageManifest = JSON.parse(
+      await readFile(join(repoRoot, "package.json"), "utf8"),
+    ) as PackageManifest;
+    const oxlintVersion = packageManifest.devDependencies?.oxlint;
+    const typescriptVersion = packageManifest.devDependencies?.typescript;
+    if (typeof oxlintVersion !== "string" || typeof typescriptVersion !== "string") {
+      throw new Error("package.json must declare string devDependencies for oxlint and typescript");
+    }
 
     const packed = JSON.parse(
       execFileSync(
@@ -65,6 +75,16 @@ test("the packed package works from a fresh npm consumer", async () => {
       join(consumerRoot, "issue-service.ts"),
       "export const makeIssueService = () => ({});\n",
     );
+    await writeFile(
+      join(consumerRoot, "consumer-types.ts"),
+      [
+        'import antiSlop from "@sematico/anti-slop";',
+        'import antiSlopEffect from "@sematico/anti-slop/effect";',
+        "antiSlop;",
+        "antiSlopEffect;",
+        "",
+      ].join("\n"),
+    );
 
     await execFileSync(
       "npm",
@@ -75,7 +95,23 @@ test("the packed package works from a fresh npm consumer", async () => {
         "--no-fund",
         "--save-dev",
         `oxlint@${oxlintVersion}`,
+        `typescript@${typescriptVersion}`,
         tarballPath,
+      ],
+      { cwd: consumerRoot, stdio: "ignore" },
+    );
+
+    execFileSync(
+      join(consumerRoot, "node_modules/.bin/tsc"),
+      [
+        "--noEmit",
+        "--module",
+        "NodeNext",
+        "--moduleResolution",
+        "NodeNext",
+        "--target",
+        "ES2022",
+        "consumer-types.ts",
       ],
       { cwd: consumerRoot, stdio: "ignore" },
     );
@@ -142,6 +178,8 @@ test("the packed package works from a fresh npm consumer", async () => {
     for (const expectedEntry of [
       "package/dist/index.js",
       "package/dist/effect.js",
+      "package/dist/index.d.ts",
+      "package/dist/effect.d.ts",
       "package/README.md",
       "package/LICENSE",
       "package/UPSTREAM.md",
