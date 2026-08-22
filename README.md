@@ -68,23 +68,24 @@ root package:
 
 ## Release
 
-The first `0.1.0` release must be bootstrapped manually because npm trusted
-publishing cannot create a new package. From a clean checkout, run
-`npm run verify` and `npm pack --dry-run --json`, then publish `0.1.0` from an
-authenticated `@sematico` account with 2FA and public access:
+The npm namespace is bootstrapped once with an empty public `0.0.0` package;
+npm trusted publishing cannot create a new package. The first real release is
+`0.1.0` and is published by the GitHub Actions workflow. From a clean checkout,
+run `npm run verify` and `npm pack --dry-run --json`, then configure npm trusted
+publishing for the exact GitHub repository and workflow below:
 
 ```sh
-npm publish --access public --ignore-scripts
+npm trust github @sematico/anti-slop \
+  --file publish-npm.yml \
+  --repo alessandrotesoro/anti-slop \
+  --env npm \
+  --allow-publish
 ```
 
-After that bootstrap, configure npm trusted publishing for the exact GitHub
-repository `alessandrotesoro/anti-slop` and the workflow
-`.github/workflows/publish-npm.yml`. Configure a protected GitHub environment
-named `npm` with a maintainer required reviewer. For each follow-up release,
-update the package version and lockfile, push a matching `v<version>` tag, and
-approve the `npm` deployment when prompted. The workflow publishes with npm
-OIDC provenance and verifies that the version is visible in the public
-registry.
+Configure the GitHub environment named `npm` according to your repository
+plan. Push a matching `v<version>` tag (the first one is `v0.1.0`) to run
+`.github/workflows/publish-npm.yml`. The workflow publishes with npm OIDC
+provenance and verifies that the version is visible in the public registry.
 
 ## Attribution and updates
 
